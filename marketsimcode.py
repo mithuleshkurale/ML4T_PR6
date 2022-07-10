@@ -40,7 +40,7 @@ def author():
 
 def compute_portvals(
         tradesMadeDF,
-        symbol="JPM",
+        symbols=["JPM"],
         startDate=dt.datetime(2008, 1, 1),
         endDate=dt.datetime(2009, 12, 31),
         start_val=1000000,
@@ -62,14 +62,14 @@ def compute_portvals(
     :rtype: pandas.DataFrame
     """
 
-    pricesDF = get_data(symbol, pd.date_range(startDate, endDate))
+    pricesDF = get_data(symbols, pd.date_range(startDate, endDate))
     pricesDF["Cash"] = 1
 
     # Step 4: Populate the trades data frame
-    tradesDF = populateTradesDataFrame(tradesMadeDF, pricesDF, commission, impact, symbol)
+    tradesDF = populateTradesDataFrame(tradesMadeDF, pricesDF, commission, impact, symbols)
 
     # Step 5: Populate the holdings data
-    holdingsDF = populateHoldingsDataFrame(tradesDF, start_val, symbol)
+    holdingsDF = populateHoldingsDataFrame(tradesDF, start_val, symbols)
     portVals = computePortVals(pricesDF, holdingsDF)
     portVals = portVals.set_index('Date')
 
@@ -79,13 +79,13 @@ def compute_portvals(
 def computePortVals(pricesDF, holdingsDF):
     symbols = holdingsDF.columns[1:-1]
     holdingsDF["PortVal"] = 0
-    stockPriceForDayT = {}
+
     for i in range(len(holdingsDF)):
         # for each row in orders fetch the column data
         val = 0
         date = holdingsDF.loc[i, "Date"]
         cash = holdingsDF.loc[i, "Cash"]
-        stockPriceForDayT = {}
+
         for sym in symbols:
             val = val + (pricesDF.loc[date, sym] * holdingsDF.loc[i, sym])
         val += cash
@@ -94,30 +94,30 @@ def computePortVals(pricesDF, holdingsDF):
     return holdingsDF[["Date", "PortVal"]]
 
 
-def populateTradesDataFrame(tradesMadeDF, pricesDF, commission, impact, symbol):
+def populateTradesDataFrame(tradesMadeDF, pricesDF, commission, impact, symbols):
     col_names = ["Date", "Cash"]
-    col_names.extend(symbol)
+    col_names.extend(symbols)
     tradesDataFrame = pd.DataFrame(np.zeros((len(pricesDF), len(col_names))), columns=col_names)
     tradesDataFrame['Date'] = pricesDF.index
     tradesDataFrame["Cash"] = 0
-
+    symbol = symbols[0]
     for date, row in tradesMadeDF.iterrows():
         # for each row in orders fetch the column data
-        shares = row['Shares']
+        shares_traded = row['Trades']
 
         # if buy order than for specific date add to existing shares of certain stock
 
         stockPrice = pricesDF.loc[date, symbol]
 
-        if shares > 0:  # BUY
-            currCashEarnings = ((stockPrice * shares * (-1 - impact)) - commission)
-        elif shares < 0:  # SELL
-            currCashEarnings = (stockPrice * abs(shares) * (1 - impact)) - commission
-        elif shares == 0:  # DO Nothing
+        if shares_traded > 0:  # BUY
+            currCashEarnings = ((stockPrice * shares_traded * (-1 - impact)) - commission)
+        elif shares_traded < 0:  # SELL
+            currCashEarnings = (stockPrice * abs(shares_traded) * (1 - impact)) - commission
+        elif shares_traded == 0:  # DO Nothing
             currCashEarnings = 0
         else:
             raise Exception("Unidentifiable order type")
-        tradesDataFrame.loc[tradesDataFrame['Date'] == date, symbol] += shares
+        tradesDataFrame.loc[tradesDataFrame['Date'] == date, symbol] += shares_traded
         tradesDataFrame.loc[tradesDataFrame['Date'] == date, "Cash"] += currCashEarnings
 
     return tradesDataFrame

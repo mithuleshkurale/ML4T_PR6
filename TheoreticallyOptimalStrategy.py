@@ -30,7 +30,7 @@ def testPolicy(symbol="JPM", sd=dt.datetime(2008, 1, 1), ed=dt.datetime(2009, 12
 
     avgPrice = pricesDF[symbol].mean()
     best_position = max(positions, key=lambda position: position[0] + position[1] * avgPrice)  # determine the best position that maximizes cash holdings
-    ordersDF = pd.DataFrame(best_position[2], columns=['Shares'])
+    ordersDF = pd.DataFrame(best_position[2], columns=['Trades'])
     ordersDF['Date'] = pricesDF.index
     ordersDF = ordersDF.set_index('Date')
 
@@ -54,11 +54,13 @@ def determineBestPositions(positions):
 
 
 def benchMark(symbol="JPM", sd=dt.datetime(2008, 1, 1), ed=dt.datetime(2009, 12, 31)):
-    pricesDF = get_data([symbol], pd.date_range(sd, ed))
+    pricesDF = get_data(symbol, pd.date_range(sd, ed))
+    pricesDF = pricesDF.fillna(method="ffill").fillna(method="bfill")
+    pricesDF.drop(columns=["SPY"], inplace=True)
 
-    ordersDF = pd.DataFrame(0, columns=['Shares'])
-    ordersDF.loc[0, 'Shares'] = 1000
+    ordersDF = pd.DataFrame(columns=['Date','Trades'])
     ordersDF['Date'] = pricesDF.index
+    ordersDF.loc[0, 'Trades'] = 1000
     ordersDF = ordersDF.set_index('Date')
-
+    ordersDF['Trades'] = ordersDF['Trades'].fillna(0)
     return ordersDF
